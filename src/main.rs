@@ -31,6 +31,23 @@ impl App {
     fn new() -> Self {
         Self { end: None }
     }
+    fn display_text(&self) -> String {
+        if let Some(end) = self.end {
+            // In duration seceonds is round down: 59.3s -> 59
+            // Here when 59.3 -> 60, we show 60 in the clock
+            let remaining_seconds = (end.duration_since(Instant::now()).as_secs()) + 1;
+            let hour = remaining_seconds / 3600;
+            let minute = (remaining_seconds % 3600) / 60;
+            let second = remaining_seconds % 60;
+            if hour >= 1 {
+                format!("{:02}:{:02}:{:02}", hour, minute, second)
+            } else {
+                format!("{:02}:{:02}", minute, second)
+            }
+        } else {
+            "start".to_owned()
+        }
+    }
 }
 
 impl eframe::App for App {
@@ -50,14 +67,10 @@ impl eframe::App for App {
             });
         egui::panel::CentralPanel::default().show(ui, |ui| {
             let size = ui.available_size();
-            let now = Instant::now();
             match self.end {
-                Some(end) if now < end => {
-                    // In duration seceonds is round down: 59.3s -> 59
-                    // Here when 59.3 -> 60, we show 60 in the clock
-                    let left_seconds = (end.duration_since(now).as_secs()) + 1;
+                Some(end) if Instant::now() < end => {
                     if ui
-                        .add_sized(size, egui::Button::new(format!("{left_seconds}")))
+                        .add_sized(size, egui::Button::new(self.display_text()))
                         .clicked()
                     {
                         self.end = None;
@@ -65,7 +78,10 @@ impl eframe::App for App {
                     ui.ctx().request_repaint_after(Duration::from_millis(100));
                 }
                 _ => {
-                    if ui.add_sized(size, egui::Button::new("start")).clicked() {
+                    if ui
+                        .add_sized(size, egui::Button::new(self.display_text()))
+                        .clicked()
+                    {
                         self.end = Some(Instant::now() + Duration::from_secs(INIT_SECONDS))
                     }
                 }
