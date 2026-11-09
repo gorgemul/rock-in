@@ -74,12 +74,12 @@ impl eframe::App for App {
                 ui.painter()
                     .circle_filled(rect.center(), radius, Color32::from_rgb(214, 96, 77));
                 let mut ratio = 0.0;
-                if let Some(end) = self.end {
-                    if now < end {
-                        let start = self.start.unwrap();
-                        ratio = now.duration_since(start).as_millis() as f32
-                            / end.duration_since(start).as_millis() as f32;
-                    }
+                if let Some(end) = self.end
+                    && now < end
+                {
+                    let start = self.start.unwrap();
+                    ratio = now.duration_since(start).as_millis() as f32
+                        / end.duration_since(start).as_millis() as f32;
                 }
                 ui.painter().add(draw_sector(
                     ratio,
