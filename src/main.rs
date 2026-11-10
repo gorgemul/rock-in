@@ -26,6 +26,7 @@ fn main() -> eframe::Result {
 
 #[derive(Debug)]
 struct App {
+    now: Instant,
     start: Option<Instant>,
     end: Option<Instant>,
 }
@@ -33,9 +34,18 @@ struct App {
 impl App {
     fn new() -> Self {
         Self {
+            now: Instant::now(),
             start: None,
             end: None,
         }
+    }
+    fn reset(&mut self, seconds: u64) {
+        self.start = Some(self.now);
+        self.end = Some(self.now + Duration::from_secs(seconds));
+    }
+    fn clear(&mut self) {
+        self.start = None;
+        self.end = None;
     }
     fn display_text(&self) -> String {
         if let Some(end) = self.end {
@@ -54,14 +64,40 @@ impl App {
             "start".to_owned()
         }
     }
+    fn tick(&mut self) {
+        self.now = Instant::now();
+    }
+    fn is_on_and_not_finish(&self) -> bool {
+        if let Some(end) = self.end {
+            self.now < end
+        } else {
+            false
+        }
+    }
+    fn is_on_and_finished(&self) -> bool {
+        if let Some(end) = self.end {
+            self.now >= end
+        } else {
+            false
+        }
+    }
+    fn remaining_ratio(&self) -> f32 {
+        match self.end {
+            Some(end) if self.now < end => {
+                let start = self.start.unwrap();
+                self.now.duration_since(start).as_millis() as f32
+                    / end.duration_since(start).as_millis() as f32
+            }
+            _ => 0.0,
+        }
+    }
 }
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        let now = Instant::now();
-        if matches!(self.end, Some(end) if now >= end) {
-            self.end = None;
-            self.start = None;
+        self.tick();
+        if self.is_on_and_finished() {
+            self.clear();
         }
         egui::Panel::top("top-panel")
             .frame(egui::Frame::side_top_panel(ui.style()).inner_margin(MARGIN))
@@ -73,16 +109,8 @@ impl eframe::App for App {
                     ui.allocate_exact_size(egui::Vec2::splat(width), egui::Sense::hover());
                 ui.painter()
                     .circle_filled(rect.center(), radius, Color32::from_rgb(214, 96, 77));
-                let mut ratio = 0.0;
-                if let Some(end) = self.end
-                    && now < end
-                {
-                    let start = self.start.unwrap();
-                    ratio = now.duration_since(start).as_millis() as f32
-                        / end.duration_since(start).as_millis() as f32;
-                }
                 ui.painter().add(draw_sector(
-                    ratio,
+                    self.remaining_ratio(),
                     ui.visuals().panel_fill,
                     Stroke::new(0.0, Color32::default()),
                     rect.center(),
@@ -91,25 +119,21 @@ impl eframe::App for App {
             });
         egui::panel::CentralPanel::default().show(ui, |ui| {
             let size = ui.available_size();
-            match self.end {
-                Some(end) if now < end => {
-                    if ui
-                        .add_sized(size, egui::Button::new(self.display_text()))
-                        .clicked()
-                    {
-                        self.start = None;
-                        self.end = None;
-                    }
-                    ui.ctx().request_repaint_after(Duration::from_millis(100));
+            if self.is_on_and_not_finish() {
+                if ui
+                    .add_sized(size, egui::Button::new(self.display_text()))
+                    .clicked()
+                {
+                    self.clear();
                 }
-                _ => {
-                    if ui
-                        .add_sized(size, egui::Button::new(self.display_text()))
-                        .clicked()
-                    {
-                        self.start = Some(now);
-                        self.end = Some(now + Duration::from_secs(INIT_SECONDS))
-                    }
+                ui.ctx().request_repaint_after(Duration::from_millis(100));
+            } else {
+                // off or finish
+                if ui
+                    .add_sized(size, egui::Button::new(self.display_text()))
+                    .clicked()
+                {
+                    self.reset(INIT_SECONDS);
                 }
             }
         });
