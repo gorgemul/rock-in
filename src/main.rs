@@ -4,11 +4,14 @@ use eframe::epaint::PathStroke;
 use std::f32::consts::{PI, TAU};
 use std::time::{Duration, Instant};
 
+mod store;
+
 const RADIUS: f32 = 200.0;
 const MARGIN: i8 = 4;
 const INIT_SECONDS: u64 = 3600;
 
 fn main() -> eframe::Result {
+    let store = store::Store::new().expect("Fail to init store");
     eframe::run_native(
         "rockin",
         eframe::NativeOptions {
@@ -19,21 +22,23 @@ fn main() -> eframe::Result {
         },
         Box::new(|cc| {
             cc.egui_ctx.set_theme(egui::Theme::Dark);
-            Ok(Box::new(App::new()))
+            Ok(Box::new(App::new(store)))
         }),
     )
 }
 
 #[derive(Debug)]
 struct App {
+    store: store::Store,
     now: Instant,
     start: Option<Instant>,
     end: Option<Instant>,
 }
 
 impl App {
-    fn new() -> Self {
+    fn new(store: store::Store) -> Self {
         Self {
+            store,
             now: Instant::now(),
             start: None,
             end: None,
@@ -44,6 +49,11 @@ impl App {
         self.end = Some(self.now + Duration::from_secs(seconds));
     }
     fn clear(&mut self) {
+        if let Some(start) = self.start
+            && let Err(err) = self.store.save(self.now.duration_since(start).as_secs())
+        {
+            eprintln!("Fail to save session: {}", err);
+        }
         self.start = None;
         self.end = None;
     }
