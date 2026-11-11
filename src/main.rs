@@ -1,5 +1,4 @@
-use eframe::egui::{self, Color32};
-use eframe::egui::{Pos2, Stroke};
+use eframe::egui;
 use eframe::epaint::PathStroke;
 use std::f32::consts::{PI, TAU};
 use std::time::{Duration, Instant};
@@ -117,12 +116,15 @@ impl eframe::App for App {
                 let radius = width / 2.0;
                 let (rect, _) =
                     ui.allocate_exact_size(egui::Vec2::splat(width), egui::Sense::hover());
-                ui.painter()
-                    .circle_filled(rect.center(), radius, Color32::from_rgb(214, 96, 77));
+                ui.painter().circle_filled(
+                    rect.center(),
+                    radius,
+                    egui::Color32::from_rgb(214, 96, 77),
+                );
                 ui.painter().add(draw_sector(
                     self.remaining_ratio(),
                     ui.visuals().panel_fill,
-                    Stroke::new(0.0, Color32::default()),
+                    egui::Stroke::new(0.0, egui::Color32::default()),
                     rect.center(),
                     radius,
                 ));
@@ -171,12 +173,17 @@ impl eframe::App for App {
 
 fn draw_sector(
     ratio: f32,
-    fill: impl Into<Color32>,
+    fill: impl Into<egui::Color32>,
     stroke: impl Into<PathStroke>,
-    center: Pos2,
+    center: egui::Pos2,
     radius: f32,
 ) -> egui::Shape {
-    fn sector_points(center: Pos2, radius: f32, start_radiant: f32, end_radiant: f32) -> Vec<Pos2> {
+    fn sector_points(
+        center: egui::Pos2,
+        radius: f32,
+        start_radiant: f32,
+        end_radiant: f32,
+    ) -> Vec<egui::Pos2> {
         let segments = (((end_radiant - start_radiant).abs() / TAU) * 64.0)
             .ceil()
             .max(2.0) as usize;
@@ -186,7 +193,7 @@ fn draw_sector(
             let t = start_radiant + (((end_radiant - start_radiant) * i as f32) / segments as f32);
             let x = center.x + radius * t.cos();
             let y = center.y + radius * t.sin();
-            points.push(Pos2::new(x, y));
+            points.push(egui::Pos2::new(x, y));
         }
         points
     }
