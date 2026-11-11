@@ -44,7 +44,7 @@ impl App {
             end: None,
         }
     }
-    fn reset(&mut self, seconds: u64) {
+    fn start(&mut self, seconds: u64) {
         self.start = Some(self.now);
         self.end = Some(self.now + Duration::from_secs(seconds));
     }
@@ -128,10 +128,10 @@ impl eframe::App for App {
                 ));
             });
         egui::panel::CentralPanel::default().show(ui, |ui| {
-            let size = ui.available_size();
+            let bottom_size = ui.available_size();
             if self.is_on_and_not_finish() {
                 if ui
-                    .add_sized(size, egui::Button::new(self.display_text()))
+                    .add_sized(bottom_size, egui::Button::new(self.display_text()))
                     .clicked()
                 {
                     self.clear();
@@ -139,12 +139,31 @@ impl eframe::App for App {
                 ui.ctx().request_repaint_after(Duration::from_millis(100));
             } else {
                 // off or finish
-                if ui
-                    .add_sized(size, egui::Button::new(self.display_text()))
-                    .clicked()
-                {
-                    self.reset(INIT_SECONDS);
-                }
+                const ITEM_NUM: u32 = 2; // how many items in the bottom layout
+                let item_total_spacing_x = (ITEM_NUM - 1) as f32 * ui.spacing().item_spacing.x;
+                let usable_x = bottom_size.x - item_total_spacing_x;
+                let start_button_x = usable_x * 0.75;
+                let list_button_x = usable_x - start_button_x;
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Max), |ui| {
+                    if ui
+                        .add_sized(
+                            egui::Vec2::new(start_button_x, bottom_size.y),
+                            egui::Button::new(self.display_text()),
+                        )
+                        .clicked()
+                    {
+                        self.start(INIT_SECONDS);
+                    }
+                    if ui
+                        .add_sized(
+                            egui::Vec2::new(list_button_x, bottom_size.y),
+                            egui::Button::new("history"),
+                        )
+                        .clicked()
+                    {
+                        println!("hello");
+                    }
+                });
             }
         });
     }
