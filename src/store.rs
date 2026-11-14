@@ -36,11 +36,11 @@ impl Store {
         // NOTE: We are not handling situation when we are ticking the clock, but the program is being
         // terminated in midway. So we just simply clean those problemetic entries right now, maybe
         // catch those terminated signal and call end_session to save that session.
-        if let Ok(effected_row) =
+        if let Ok(effected_rows) =
             conn.execute("DELETE FROM sessions WHERE duration_seconds IS NULL", ())
-            && effected_row > 0
+            && effected_rows > 0
         {
-            eprintln!("{effected_row} broken sessions being deleted");
+            eprintln!("{effected_rows} broken sessions being deleted");
         }
         Ok(Self { conn })
     }
