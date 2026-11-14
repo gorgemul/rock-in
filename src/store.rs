@@ -50,10 +50,13 @@ impl Store {
         Ok(())
     }
     pub fn end_session(&self, duration: u64) -> Result<()> {
-        self.conn.execute(
+        if let Ok(effected_rows) = self.conn.execute(
             "UPDATE sessions SET duration_seconds = ?1 WHERE duration_seconds IS NULL",
             params![&(duration as i32)],
-        )?;
+        ) && effected_rows != 1
+        {
+            eprintln!("Should only save one session but {effected_rows}");
+        }
         Ok(())
     }
     pub fn find_all(&self) -> Result<Vec<Session>> {
