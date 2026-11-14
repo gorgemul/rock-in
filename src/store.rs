@@ -29,15 +29,29 @@ impl Store {
         conn.execute(
             "CREATE TABLE IF NOT EXISTS sessions(
             id INTEGER PRIMARY KEY,
-            duration_seconds INTEGER,
+            duration_seconds INTEGER NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
             (),
         )?;
+        // NOTE: We are not handling situation when we are ticking the clock, but the program is being
+        // terminated in midway. So we just simply clean those problemetic entries right now, maybe
+        // catch those terminated signal and call end_session to save that session.
+        if let Ok(effected_row) =
+            conn.execute("DELETE FROM sessions WHERE duration_seconds IS NULL", ())
+            && effected_row > 0
+        {
+            eprintln!("{effected_row} broken sessions being deleted");
+        }
         Ok(Self { conn })
     }
-    pub fn save(&mut self, duration: u64) -> Result<()> {
+    pub fn start_session(&self) -> Result<()> {
+        self.conn
+            .execute("INSERT INTO sessions DEFAULT VALUES", ())?;
+        Ok(())
+    }
+    pub fn end_session(&self, duration: u64) -> Result<()> {
         self.conn.execute(
-            "INSERT INTO sessions (duration_seconds) VALUES (?1)",
+            "UPDATE sessions SET duration_seconds = ?1 WHERE duration_seconds IS NULL",
             params![&(duration as i32)],
         )?;
         Ok(())
