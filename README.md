@@ -3,7 +3,7 @@
 ## Screenshot
 
 ### Clock mode
-![Clock](./asset/clock.png)
+<img src="./asset/clock.png" width="200" alt="Clock">
 
 ### List mode
-![List](./asset/list.png)
+<img src="./asset/list.png" width="200" alt="List">
