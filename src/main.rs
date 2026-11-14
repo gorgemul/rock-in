@@ -16,6 +16,8 @@ const APP_WIDTH: f32 = 400.0;
 const APP_HEIGHT: f32 = APP_WIDTH + 50.0;
 const LOCK_IN_SECONDS: u64 = 3600;
 
+// TODO: 1. add icon; 2. should send notification on this app instead of with terminal; 3. when cmd
+// + w dont kill the app
 fn main() -> eframe::Result {
     let store = store::Store::new().expect("Fail to init store");
     #[cfg(target_os = "macos")]

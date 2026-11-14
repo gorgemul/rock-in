@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use chrono::{DateTime, Local};
 use rusqlite::{Connection, Result, params};
 
@@ -24,8 +26,18 @@ impl Session {
 }
 
 impl Store {
+    fn db_path() -> PathBuf {
+        let dir = dirs::data_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("rock-in");
+        if let Err(err) = std::fs::create_dir_all(&dir) {
+            eprintln!("Create dir fail: {}", err);
+        }
+        dir.join(DB_NAME)
+    }
+
     pub fn new() -> Result<Self> {
-        let conn = Connection::open(DB_NAME)?;
+        let conn = Connection::open(Self::db_path())?;
         conn.execute(
             "CREATE TABLE IF NOT EXISTS sessions(
             id INTEGER PRIMARY KEY,
