@@ -1,9 +1,15 @@
-use eframe::egui;
+use eframe::egui::{self, Color32};
 use eframe::epaint::PathStroke;
 use std::f32::consts::{PI, TAU};
 use std::time::{Duration, Instant};
 
 mod store;
+
+#[derive(Debug)]
+enum AppMode {
+    Clock,
+    List,
+}
 
 const RADIUS: f32 = 200.0;
 const MARGIN: i8 = 4;
@@ -19,16 +25,14 @@ fn main() -> eframe::Result {
                 .with_resizable(false),
             ..Default::default()
         },
-        Box::new(|cc| {
-            cc.egui_ctx.set_theme(egui::Theme::Dark);
-            Ok(Box::new(App::new(store)))
-        }),
+        Box::new(|_| Ok(Box::new(App::new(store)))),
     )
 }
 
 #[derive(Debug)]
 struct App {
     store: store::Store,
+    mode: AppMode,
     now: Instant,
     start: Option<Instant>,
     end: Option<Instant>,
@@ -38,6 +42,7 @@ impl App {
     fn new(store: store::Store) -> Self {
         Self {
             store,
+            mode: AppMode::Clock,
             now: Instant::now(),
             start: None,
             end: None,
@@ -61,14 +66,7 @@ impl App {
             // In duration seceonds is round down: 59.3s -> 59
             // Here when 59.3 -> 60, we show 60 in the clock
             let remaining_seconds = (end.duration_since(Instant::now()).as_secs()) + 1;
-            let hour = remaining_seconds / 3600;
-            let minute = (remaining_seconds % 3600) / 60;
-            let second = remaining_seconds % 60;
-            if hour >= 1 {
-                format!("{:02}:{:02}:{:02}", hour, minute, second)
-            } else {
-                format!("{:02}:{:02}", minute, second)
-            }
+            format_time(remaining_seconds)
         } else {
             "start".to_owned()
         }
@@ -109,63 +107,113 @@ impl eframe::App for App {
             self.clear();
         }
         egui::Panel::top("top-panel")
-            .frame(egui::Frame::side_top_panel(ui.style()).inner_margin(MARGIN))
-            .min_size((RADIUS - MARGIN as f32) * 2.0)
+            .min_size((RADIUS - MARGIN as f32) * 2.0) // kinda ugly, another way to impl it?
             .show(ui, |ui| {
                 let width = ui.available_width();
-                let radius = width / 2.0;
-                let (rect, _) =
-                    ui.allocate_exact_size(egui::Vec2::splat(width), egui::Sense::hover());
-                ui.painter().circle_filled(
-                    rect.center(),
-                    radius,
-                    egui::Color32::from_rgb(214, 96, 77),
-                );
-                ui.painter().add(draw_sector(
-                    self.remaining_ratio(),
-                    ui.visuals().panel_fill,
-                    egui::Stroke::new(0.0, egui::Color32::default()),
-                    rect.center(),
-                    radius,
-                ));
+                match self.mode {
+                    AppMode::Clock => {
+                        let radius = width / 2.0;
+                        let (rect, _) =
+                            ui.allocate_exact_size(egui::Vec2::splat(width), egui::Sense::hover());
+                        ui.painter().circle_filled(
+                            rect.center(),
+                            radius,
+                            egui::Color32::from_rgb(214, 96, 77),
+                        );
+                        ui.painter().add(draw_sector(
+                            self.remaining_ratio(),
+                            ui.visuals().panel_fill,
+                            egui::Stroke::new(0.0, egui::Color32::default()),
+                            rect.center(),
+                            radius,
+                        ));
+                    }
+                    AppMode::List => {
+                        egui::ScrollArea::vertical()
+                            .auto_shrink(false)
+                            .max_height(width)
+                            .show(ui, |ui| {
+                                let sessions = match self.store.find_all() {
+                                    Ok(sessions) => sessions,
+                                    Err(err) => {
+                                        eprint!("Error on loading sessions: {}", err);
+                                        vec![]
+                                    }
+                                };
+                                let duration_seconds: u64 = sessions
+                                    .iter()
+                                    .map(|session| session.duration_seconds())
+                                    .sum();
+                                let text = egui::RichText::new(format!(
+                                    "Summary: {} over {} sessions",
+                                    format_time(duration_seconds),
+                                    sessions.len(),
+                                ))
+                                .strong()
+                                .color(Color32::GRAY)
+                                .size(18.0);
+                                ui.label(text);
+                                for session in &sessions {
+                                    ui.label(format!(
+                                        "- {} last {}",
+                                        session.created_at(),
+                                        format_time(session.duration_seconds()),
+                                    ));
+                                }
+                            });
+                    }
+                }
             });
         egui::panel::CentralPanel::default().show(ui, |ui| {
             let bottom_size = ui.available_size();
-            if self.is_on_and_not_finish() {
-                if ui
-                    .add_sized(bottom_size, egui::Button::new(self.display_text()))
-                    .clicked()
-                {
-                    self.clear();
+            match self.mode {
+                AppMode::Clock => {
+                    if self.is_on_and_not_finish() {
+                        if ui
+                            .add_sized(bottom_size, egui::Button::new(self.display_text()))
+                            .clicked()
+                        {
+                            self.clear();
+                        }
+                        ui.ctx().request_repaint_after(Duration::from_millis(100));
+                    } else {
+                        // off or finish
+                        const ITEM_NUM: u32 = 2; // how many items in the bottom layout
+                        let item_total_spacing_x =
+                            (ITEM_NUM - 1) as f32 * ui.spacing().item_spacing.x;
+                        let usable_x = bottom_size.x - item_total_spacing_x;
+                        let start_button_x = usable_x * 0.75;
+                        let list_button_x = usable_x - start_button_x;
+                        ui.with_layout(egui::Layout::left_to_right(egui::Align::Max), |ui| {
+                            if ui
+                                .add_sized(
+                                    egui::Vec2::new(start_button_x, bottom_size.y),
+                                    egui::Button::new(self.display_text()),
+                                )
+                                .clicked()
+                            {
+                                self.start(INIT_SECONDS);
+                            }
+                            if ui
+                                .add_sized(
+                                    egui::Vec2::new(list_button_x, bottom_size.y),
+                                    egui::Button::new("history"),
+                                )
+                                .clicked()
+                            {
+                                self.mode = AppMode::List;
+                            }
+                        });
+                    }
                 }
-                ui.ctx().request_repaint_after(Duration::from_millis(100));
-            } else {
-                // off or finish
-                const ITEM_NUM: u32 = 2; // how many items in the bottom layout
-                let item_total_spacing_x = (ITEM_NUM - 1) as f32 * ui.spacing().item_spacing.x;
-                let usable_x = bottom_size.x - item_total_spacing_x;
-                let start_button_x = usable_x * 0.75;
-                let list_button_x = usable_x - start_button_x;
-                ui.with_layout(egui::Layout::left_to_right(egui::Align::Max), |ui| {
+                AppMode::List => {
                     if ui
-                        .add_sized(
-                            egui::Vec2::new(start_button_x, bottom_size.y),
-                            egui::Button::new(self.display_text()),
-                        )
+                        .add_sized(bottom_size, egui::Button::new("back"))
                         .clicked()
                     {
-                        self.start(INIT_SECONDS);
+                        self.mode = AppMode::Clock;
                     }
-                    if ui
-                        .add_sized(
-                            egui::Vec2::new(list_button_x, bottom_size.y),
-                            egui::Button::new("history"),
-                        )
-                        .clicked()
-                    {
-                        println!("hello");
-                    }
-                });
+                }
             }
         });
     }
@@ -200,4 +248,15 @@ fn draw_sector(
     const START: f32 = PI * -0.5;
     let end = START + (2.0 * PI) * ratio;
     egui::Shape::convex_polygon(sector_points(center, radius, START, end), fill, stroke)
+}
+
+fn format_time(seconds: u64) -> String {
+    let hour = seconds / 3600;
+    let minute = (seconds % 3600) / 60;
+    let second = seconds % 60;
+    if hour >= 1 {
+        format!("{:02}:{:02}:{:02}", hour, minute, second)
+    } else {
+        format!("{:02}:{:02}", minute, second)
+    }
 }
