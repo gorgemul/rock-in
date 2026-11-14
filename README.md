@@ -1,4 +1,9 @@
 # rock-in
 
 ## Screenshot
-![rock-in](./asset/app.png)
+
+### Clock mode
+![Clock](./asset/clock.png)
+
+### List mode
+![List](./asset/list.png)
