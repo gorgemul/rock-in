@@ -1,3 +1,4 @@
+use core::panic;
 use eframe::egui::{self, Color32};
 use eframe::epaint::PathStroke;
 use std::f32::consts::{PI, TAU};
@@ -11,9 +12,9 @@ enum AppMode {
     List,
 }
 
-const RADIUS: f32 = 200.0;
-const MARGIN: i8 = 4;
-const INIT_SECONDS: u64 = 3600;
+const APP_WIDTH: f32 = 400.0;
+const APP_HEIGHT: f32 = APP_WIDTH + 50.0;
+const LOCK_IN_SECONDS: u64 = 3600;
 
 fn main() -> eframe::Result {
     let store = store::Store::new().expect("Fail to init store");
@@ -21,7 +22,7 @@ fn main() -> eframe::Result {
         "rockin",
         eframe::NativeOptions {
             viewport: egui::ViewportBuilder::default()
-                .with_inner_size([400.0, 500.0])
+                .with_inner_size([APP_WIDTH, APP_HEIGHT])
                 .with_resizable(false),
             ..Default::default()
         },
@@ -49,12 +50,17 @@ impl App {
         }
     }
     fn start(&mut self, seconds: u64) {
+        if let Err(err) = self.store.start_session() {
+            panic!("FATAL: fail to start session: {}", err)
+        }
         self.start = Some(self.now);
         self.end = Some(self.now + Duration::from_secs(seconds));
     }
     fn clear(&mut self) {
         if let Some(start) = self.start
-            && let Err(err) = self.store.save(self.now.duration_since(start).as_secs())
+            && let Err(err) = self
+                .store
+                .end_session(self.now.duration_since(start).as_secs())
         {
             eprintln!("Fail to save session: {}", err);
         }
@@ -106,64 +112,62 @@ impl eframe::App for App {
         if self.is_on_and_finished() {
             self.clear();
         }
-        egui::Panel::top("top-panel")
-            .min_size((RADIUS - MARGIN as f32) * 2.0) // kinda ugly, another way to impl it?
-            .show(ui, |ui| {
-                let width = ui.available_width();
-                match self.mode {
-                    AppMode::Clock => {
-                        let radius = width / 2.0;
-                        let (rect, _) =
-                            ui.allocate_exact_size(egui::Vec2::splat(width), egui::Sense::hover());
-                        ui.painter().circle_filled(
-                            rect.center(),
-                            radius,
-                            egui::Color32::from_rgb(214, 96, 77),
-                        );
-                        ui.painter().add(draw_sector(
-                            self.remaining_ratio(),
-                            ui.visuals().panel_fill,
-                            egui::Stroke::new(0.0, egui::Color32::default()),
-                            rect.center(),
-                            radius,
-                        ));
-                    }
-                    AppMode::List => {
-                        egui::ScrollArea::vertical()
-                            .auto_shrink(false)
-                            .max_height(width)
-                            .show(ui, |ui| {
-                                let sessions = match self.store.find_all() {
-                                    Ok(sessions) => sessions,
-                                    Err(err) => {
-                                        eprint!("Error on loading sessions: {}", err);
-                                        vec![]
-                                    }
-                                };
-                                let duration_seconds: u64 = sessions
-                                    .iter()
-                                    .map(|session| session.duration_seconds())
-                                    .sum();
-                                let text = egui::RichText::new(format!(
-                                    "Summary: {} over {} sessions",
-                                    format_time(duration_seconds),
-                                    sessions.len(),
-                                ))
-                                .strong()
-                                .color(Color32::GRAY)
-                                .size(18.0);
-                                ui.label(text);
-                                for session in &sessions {
-                                    ui.label(format!(
-                                        "- {} last {}",
-                                        session.created_at(),
-                                        format_time(session.duration_seconds()),
-                                    ));
-                                }
-                            });
-                    }
+        egui::Panel::top("top-panel").show(ui, |ui| {
+            let width = ui.available_width();
+            match self.mode {
+                AppMode::Clock => {
+                    let radius = width / 2.0;
+                    let (rect, _) =
+                        ui.allocate_exact_size(egui::Vec2::splat(width), egui::Sense::hover());
+                    ui.painter().circle_filled(
+                        rect.center(),
+                        radius,
+                        egui::Color32::from_rgb(214, 96, 77),
+                    );
+                    ui.painter().add(draw_sector(
+                        self.remaining_ratio(),
+                        ui.visuals().panel_fill,
+                        egui::Stroke::new(0.0, egui::Color32::default()),
+                        rect.center(),
+                        radius,
+                    ));
                 }
-            });
+                AppMode::List => {
+                    egui::ScrollArea::vertical()
+                        .auto_shrink(false)
+                        .max_height(width)
+                        .show(ui, |ui| {
+                            let sessions = match self.store.find_all() {
+                                Ok(sessions) => sessions,
+                                Err(err) => {
+                                    eprint!("Error on loading sessions: {}", err);
+                                    vec![]
+                                }
+                            };
+                            let duration_seconds: u64 = sessions
+                                .iter()
+                                .map(|session| session.duration_seconds())
+                                .sum();
+                            let text = egui::RichText::new(format!(
+                                "Summary: {} over {} sessions",
+                                format_time(duration_seconds),
+                                sessions.len(),
+                            ))
+                            .strong()
+                            .color(Color32::GRAY)
+                            .size(18.0);
+                            ui.label(text);
+                            for session in &sessions {
+                                ui.label(format!(
+                                    "- {} last {}",
+                                    session.created_at(),
+                                    format_time(session.duration_seconds()),
+                                ));
+                            }
+                        });
+                }
+            }
+        });
         egui::panel::CentralPanel::default().show(ui, |ui| {
             let bottom_size = ui.available_size();
             match self.mode {
@@ -192,7 +196,7 @@ impl eframe::App for App {
                                 )
                                 .clicked()
                             {
-                                self.start(INIT_SECONDS);
+                                self.start(LOCK_IN_SECONDS);
                             }
                             if ui
                                 .add_sized(
