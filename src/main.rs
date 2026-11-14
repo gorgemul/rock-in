@@ -14,7 +14,7 @@ enum AppMode {
 
 const APP_WIDTH: f32 = 400.0;
 const APP_HEIGHT: f32 = APP_WIDTH + 50.0;
-const LOCK_IN_SECONDS: u64 = 10;
+const LOCK_IN_SECONDS: u64 = 3600;
 
 fn main() -> eframe::Result {
     let store = store::Store::new().expect("Fail to init store");
