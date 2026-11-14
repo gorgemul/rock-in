@@ -49,10 +49,10 @@ impl Store {
             .execute("INSERT INTO sessions DEFAULT VALUES", ())?;
         Ok(())
     }
-    pub fn end_session(&self, duration: u64) -> Result<()> {
+    pub fn end_session(&self, duration_seconds: u64) -> Result<()> {
         if let Ok(effected_rows) = self.conn.execute(
             "UPDATE sessions SET duration_seconds = ?1 WHERE duration_seconds IS NULL",
-            params![&(duration as i32)],
+            params![&(duration_seconds as i32)],
         ) && effected_rows != 1
         {
             eprintln!("Should only save one session but {effected_rows}");

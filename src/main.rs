@@ -14,10 +14,15 @@ enum AppMode {
 
 const APP_WIDTH: f32 = 400.0;
 const APP_HEIGHT: f32 = APP_WIDTH + 50.0;
-const LOCK_IN_SECONDS: u64 = 3600;
+const LOCK_IN_SECONDS: u64 = 10;
 
 fn main() -> eframe::Result {
     let store = store::Store::new().expect("Fail to init store");
+    #[cfg(target_os = "macos")]
+    {
+        // borrow terminal to send notification in mac
+        notify_rust::set_application("com.apple.Terminal").ok();
+    }
     eframe::run_native(
         "rockin",
         eframe::NativeOptions {
@@ -57,12 +62,18 @@ impl App {
         self.end = Some(self.now + Duration::from_secs(seconds));
     }
     fn clear(&mut self) {
-        if let Some(start) = self.start
-            && let Err(err) = self
-                .store
-                .end_session(self.now.duration_since(start).as_secs())
-        {
-            eprintln!("Fail to save session: {}", err);
+        if let Some(start) = self.start {
+            let duration_seconds = self.now.duration_since(start).as_secs();
+            if let Err(err) = self.store.end_session(duration_seconds) {
+                eprintln!("Fail to save session: {}", err);
+            }
+            if let Err(err) = notify_rust::Notification::new()
+                .summary("Session end")
+                .body(&format!("Last {}", format_time(duration_seconds)))
+                .show()
+            {
+                eprintln!("Fail to send notification: {}", err);
+            }
         }
         self.start = None;
         self.end = None;
