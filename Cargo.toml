@@ -10,7 +10,12 @@ rusqlite = { version = "0.41.1", features = ["chrono"]}
 notify-rust = { version = "4", features = ["preview-macos-un"] }
 dirs = "7.0.0"
 
-[package.metadata.bundle]
-name = "rock-in"
+[package.metadata.packager]
+before-packaging-command = "cargo build --release"
+product-name = "rock-in"
 identifier = "com.gorgemul.rock-in"
-icon = ["asset/icon.icns"]
+icons = ["asset/icon.icns"]
+formats = ["app", "dmg"]
+
+[package.metadata.packager.macos]
+signing-identity = "-"
