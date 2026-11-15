@@ -2,46 +2,24 @@ use core::panic;
 use eframe::egui::{self, Color32};
 use eframe::epaint::PathStroke;
 use std::f32::consts::{PI, TAU};
-use std::path::Path;
 use std::time::{Duration, Instant};
 
+mod notifier;
 mod store;
 
-#[derive(Debug)]
-enum AppMode {
-    Clock,
-    List,
-}
-
-// NOTE: this name should be changed in lockstep with cargo.toml, should have a way to make
-// cargo.toml and main.rs to read from the same source, which could be done by using build.rs
-// but is kinda ugly, will do that in the future(maybe).
-const APP_IDENTIFIER: &str = "com.gorgemul.rock-in";
 const APP_WIDTH: f32 = 400.0;
 const APP_HEIGHT: f32 = APP_WIDTH + 50.0;
 const LOCK_IN_SECONDS: u64 = 3600;
 
 // TODO:
-// - missing icon when send notification
-// - send notification in debug mode using terminal
-fn running_in_app_bundle() -> bool {
-    std::env::current_exe()
-        .ok()
-        .as_deref()
-        .and_then(Path::parent)
-        .is_some_and(|dir| dir.ends_with("Contents/MacOS"))
-}
-
+// - missing icon when send notification in release mode
 fn main() -> eframe::Result {
-    let store = store::Store::new().expect("Fail to init store");
-    notify_rust::set_application(APP_IDENTIFIER).ok();
-    if running_in_app_bundle() {
-        notify_rust::request_auth_blocking().expect("notification permission");
-    }
+    let store = store::Store::new().expect("init store");
+    let notifier = notifier::Notifier::new().expect("init notifier");
     let icon = eframe::icon_data::from_png_bytes(include_bytes!("../asset/icon.png"))
         .expect("load app icon");
     eframe::run_native(
-        "rockin",
+        "rock-in",
         eframe::NativeOptions {
             viewport: egui::ViewportBuilder::default()
                 .with_inner_size([APP_WIDTH, APP_HEIGHT])
@@ -49,23 +27,31 @@ fn main() -> eframe::Result {
                 .with_icon(icon),
             ..Default::default()
         },
-        Box::new(|_| Ok(Box::new(App::new(store)))),
+        Box::new(|_| Ok(Box::new(App::new(store, notifier)))),
     )
 }
 
 #[derive(Debug)]
 struct App {
     store: store::Store,
+    notifier: notifier::Notifier,
     mode: AppMode,
     now: Instant,
     start: Option<Instant>,
     end: Option<Instant>,
 }
 
+#[derive(Debug)]
+enum AppMode {
+    Clock,
+    List,
+}
+
 impl App {
-    fn new(store: store::Store) -> Self {
+    fn new(store: store::Store, notifier: notifier::Notifier) -> Self {
         Self {
             store,
+            notifier,
             mode: AppMode::Clock,
             now: Instant::now(),
             start: None,
@@ -85,14 +71,11 @@ impl App {
             if let Err(err) = self.store.end_session(duration_seconds) {
                 eprintln!("Fail to save session: {}", err);
             }
-            if running_in_app_bundle() {
-                if let Err(err) = notify_rust::Notification::new()
-                    .summary("Session end")
-                    .body(&format!("Last {}", format_time(duration_seconds)))
-                    .show()
-                {
-                    eprintln!("Fail to send notification: {}", err);
-                }
+            if let Err(err) = self.notifier.notify(
+                "Session end",
+                &format!("Last {}", format_time(duration_seconds)),
+            ) {
+                eprintln!("Fail to send notification: {}", err);
             }
         }
         self.start = None;
@@ -139,19 +122,7 @@ impl App {
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        // Magic to have the same behaviour in mac's cmd + w to hide the window, and when
-        // click the icon in the dock bring back the window
-        if ui
-            .ctx()
-            .input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::W))
-        {
-            #[cfg(target_os = "macos")]
-            {
-                if let Some(mtm) = objc2::MainThreadMarker::new() {
-                    objc2_app_kit::NSApplication::sharedApplication(mtm).hide(None);
-                }
-            }
-        }
+        handle_cmd_w_in_mac(ui);
         self.tick();
         if self.is_on_and_finished() {
             self.clear();
@@ -265,6 +236,9 @@ impl eframe::App for App {
             }
         });
     }
+    fn on_exit(&mut self) {
+        self.clear();
+    }
 }
 
 fn draw_sector(
@@ -306,5 +280,23 @@ fn format_time(seconds: u64) -> String {
         format!("{:02}:{:02}:{:02}", hour, minute, second)
     } else {
         format!("{:02}:{:02}", minute, second)
+    }
+}
+
+// Magic to have the same behaviour in mac's cmd + w to hide the window, and when
+// click the icon in the dock bring back the window
+// NOTE: we don't handle cmd + q here since we can't catch it here, app die before running the cmd +
+// q handler code
+fn handle_cmd_w_in_mac(ui: &egui::Ui) {
+    if ui
+        .ctx()
+        .input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::W))
+    {
+        #[cfg(target_os = "macos")]
+        {
+            if let Some(mtm) = objc2::MainThreadMarker::new() {
+                objc2_app_kit::NSApplication::sharedApplication(mtm).hide(None);
+            }
+        }
     }
 }

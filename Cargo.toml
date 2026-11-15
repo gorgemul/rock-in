@@ -3,18 +3,22 @@ name = "rock-in"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+# Packaged .app needs UNUserNotificationCenter. Leave this off for `cargo run`. If add this feature in debug mode, will crash the app when send the notification
+macos-un = ["notify-rust/preview-macos-un"]
+
 [dependencies]
 chrono = "0.4.45"
 eframe = "0.37.0"
 rusqlite = { version = "0.41.1", features = ["chrono"]}
-notify-rust = { version = "4", features = ["preview-macos-un"] }
+notify-rust = "4"
 dirs = "7.0.0"
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSResponder"] }
 
 [package.metadata.packager]
-before-packaging-command = "cargo build --release"
+before-packaging-command = "cargo build --release --features macos-un"
 product-name = "rock-in"
 identifier = "com.gorgemul.rock-in"
 icons = ["asset/icon.icns"]
