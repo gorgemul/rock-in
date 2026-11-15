@@ -21,8 +21,12 @@ const APP_WIDTH: f32 = 400.0;
 const APP_HEIGHT: f32 = APP_WIDTH + 50.0;
 const LOCK_IN_SECONDS: u64 = 3600;
 
-// TODO: 1. add icon; 2. when cmd + w dont kill the app; 3. should codesign the app in the code
-// level.
+// TODO:
+// 1. missing icon when send notification
+// 2. when cmd + w dont kill the app
+// 3. codesign the app in the code level
+// 4. send notification in debug mode using terminal
+// 5. build the whole using dmg?
 fn running_in_app_bundle() -> bool {
     std::env::current_exe()
         .ok()
@@ -37,12 +41,15 @@ fn main() -> eframe::Result {
     if running_in_app_bundle() {
         notify_rust::request_auth_blocking().expect("notification permission");
     }
+    let icon = eframe::icon_data::from_png_bytes(include_bytes!("../asset/icon.png"))
+        .expect("load app icon");
     eframe::run_native(
         "rockin",
         eframe::NativeOptions {
             viewport: egui::ViewportBuilder::default()
                 .with_inner_size([APP_WIDTH, APP_HEIGHT])
-                .with_resizable(false),
+                .with_resizable(false)
+                .with_icon(icon),
             ..Default::default()
         },
         Box::new(|_| Ok(Box::new(App::new(store)))),

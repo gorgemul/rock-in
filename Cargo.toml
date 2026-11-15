@@ -13,3 +13,4 @@ dirs = "7.0.0"
 [package.metadata.bundle]
 name = "rock-in"
 identifier = "com.gorgemul.rock-in"
+icon = ["asset/icon.icns"]
