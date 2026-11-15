@@ -2,6 +2,7 @@ use core::panic;
 use eframe::egui::{self, Color32};
 use eframe::epaint::PathStroke;
 use std::f32::consts::{PI, TAU};
+use std::path::Path;
 use std::time::{Duration, Instant};
 
 mod store;
@@ -20,11 +21,22 @@ const APP_WIDTH: f32 = 400.0;
 const APP_HEIGHT: f32 = APP_WIDTH + 50.0;
 const LOCK_IN_SECONDS: u64 = 3600;
 
-// TODO: 1. add icon; 2. when cmd + w dont kill the app
+// TODO: 1. add icon; 2. when cmd + w dont kill the app; 3. should codesign the app in the code
+// level.
+fn running_in_app_bundle() -> bool {
+    std::env::current_exe()
+        .ok()
+        .as_deref()
+        .and_then(Path::parent)
+        .is_some_and(|dir| dir.ends_with("Contents/MacOS"))
+}
+
 fn main() -> eframe::Result {
     let store = store::Store::new().expect("Fail to init store");
     notify_rust::set_application(APP_IDENTIFIER).ok();
-    notify_rust::request_auth_blocking().expect("notification permission");
+    if running_in_app_bundle() {
+        notify_rust::request_auth_blocking().expect("notification permission");
+    }
     eframe::run_native(
         "rockin",
         eframe::NativeOptions {
@@ -69,12 +81,14 @@ impl App {
             if let Err(err) = self.store.end_session(duration_seconds) {
                 eprintln!("Fail to save session: {}", err);
             }
-            if let Err(err) = notify_rust::Notification::new()
-                .summary("Session end")
-                .body(&format!("Last {}", format_time(duration_seconds)))
-                .show()
-            {
-                eprintln!("Fail to send notification: {}", err);
+            if running_in_app_bundle() {
+                if let Err(err) = notify_rust::Notification::new()
+                    .summary("Session end")
+                    .body(&format!("Last {}", format_time(duration_seconds)))
+                    .show()
+                {
+                    eprintln!("Fail to send notification: {}", err);
+                }
             }
         }
         self.start = None;
