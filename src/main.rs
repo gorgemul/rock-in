@@ -12,19 +12,19 @@ enum AppMode {
     List,
 }
 
+// NOTE: this name should be changed in lockstep with cargo.toml, should have a way to make
+// cargo.toml and main.rs to read from the same source, which could be done by using build.rs
+// but is kinda ugly, will do that in the future(maybe).
+const APP_IDENTIFIER: &str = "com.gorgemul.rock-in";
 const APP_WIDTH: f32 = 400.0;
 const APP_HEIGHT: f32 = APP_WIDTH + 50.0;
 const LOCK_IN_SECONDS: u64 = 3600;
 
-// TODO: 1. add icon; 2. should send notification on this app instead of with terminal; 3. when cmd
-// + w dont kill the app
+// TODO: 1. add icon; 2. when cmd + w dont kill the app
 fn main() -> eframe::Result {
     let store = store::Store::new().expect("Fail to init store");
-    #[cfg(target_os = "macos")]
-    {
-        // borrow terminal to send notification in mac
-        notify_rust::set_application("com.apple.Terminal").ok();
-    }
+    notify_rust::set_application(APP_IDENTIFIER).ok();
+    notify_rust::request_auth_blocking().expect("notification permission");
     eframe::run_native(
         "rockin",
         eframe::NativeOptions {
