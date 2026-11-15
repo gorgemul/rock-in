@@ -9,6 +9,9 @@ eframe = "0.37.0"
 rusqlite = { version = "0.41.1", features = ["chrono"]}
 notify-rust = { version = "4", features = ["preview-macos-un"] }
 dirs = "7.0.0"
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSResponder"] }
 
 [package.metadata.packager]
 before-packaging-command = "cargo build --release"
