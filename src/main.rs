@@ -22,11 +22,8 @@ const APP_HEIGHT: f32 = APP_WIDTH + 50.0;
 const LOCK_IN_SECONDS: u64 = 3600;
 
 // TODO:
-// 1. missing icon when send notification
-// 2. when cmd + w dont kill the app
-// 3. codesign the app in the code level
-// 4. send notification in debug mode using terminal
-// 5. build the whole using dmg?
+// - missing icon when send notification
+// - send notification in debug mode using terminal
 fn running_in_app_bundle() -> bool {
     std::env::current_exe()
         .ok()
@@ -142,6 +139,19 @@ impl App {
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        // Magic to have the same behaviour in mac's cmd + w to hide the window, and when
+        // click the icon in the dock bring back the window
+        if ui
+            .ctx()
+            .input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::W))
+        {
+            #[cfg(target_os = "macos")]
+            {
+                if let Some(mtm) = objc2::MainThreadMarker::new() {
+                    objc2_app_kit::NSApplication::sharedApplication(mtm).hide(None);
+                }
+            }
+        }
         self.tick();
         if self.is_on_and_finished() {
             self.clear();
