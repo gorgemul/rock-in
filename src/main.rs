@@ -11,8 +11,6 @@ const APP_WIDTH: f32 = 400.0;
 const APP_HEIGHT: f32 = APP_WIDTH + 50.0;
 const LOCK_IN_SECONDS: u64 = 3600;
 
-// TODO:
-// - missing icon when send notification in release mode
 fn main() -> eframe::Result {
     let store = store::Store::new().expect("init store");
     let notifier = notifier::Notifier::new().expect("init notifier");
