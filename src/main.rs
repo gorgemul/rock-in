@@ -119,12 +119,17 @@ impl App {
 }
 
 impl eframe::App for App {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        handle_cmd_w_in_mac(ui);
+    fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.tick();
         if self.is_on_and_finished() {
             self.clear();
         }
+        if self.is_on_and_not_finish() {
+            ctx.request_repaint_after(Duration::from_millis(100));
+        }
+    }
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        handle_cmd_w_in_mac(ui);
         egui::Panel::top("top-panel").show(ui, |ui| {
             let width = ui.available_width();
             match self.mode {
