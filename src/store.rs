@@ -45,9 +45,6 @@ impl Store {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
             (),
         )?;
-        // NOTE: We are not handling situation when we are ticking the clock, but the program is being
-        // terminated in midway. So we just simply clean those problemetic entries right now, maybe
-        // catch those terminated signal and call end_session to save that session.
         if let Ok(effected_rows) =
             conn.execute("DELETE FROM sessions WHERE duration_seconds IS NULL", ())
             && effected_rows > 0
